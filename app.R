@@ -24,6 +24,7 @@ library(glue)
 library(here)
 library(DT)
 library(curl)
+library(plotly)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -37,7 +38,11 @@ sidebarLayout(
     
     mainPanel(
         DT::dataTableOutput("metTable"),
-        DT::dataTableOutput("sedEventTable")
+        DT::dataTableOutput("sedEventTable"),
+        plotlyOutput("metPlotly",
+                     height = "1000px"),
+        plotlyOutput("sedPlotly",
+                     height = "1000px")
     )
 )
 )
@@ -137,7 +142,56 @@ server <- function(input, output) {
         output$sedEventTable <- DT::renderDataTable({
             DT::datatable(sedDataRecent)
         })
+        
+        # Met station plotly output
+        output$metPlotly <- renderPlotly({
+          vars <- names(metDatClean[3:6])
+          plotThis <- function(var){
+            plot_ly(metDatClean %>% mutate(datetimePST = ymd_hms(datetimePST)), 
+                    x = ~datetimePST, 
+                    y = as.formula(paste0("~", var)), 
+                    color = ~stationID,
+                    legendgroup=~stationID,
+                    width = 1000, height = 1000) %>%
+              add_trace(mode = "lines+markers",
+                        type = "scattergl",
+                        marker = list(size = 4),
+                        line = list(width = 2),color = ~stationID) 
+          }
+          plots <- purrr::map(vars, plotThis)
+          
+          subplot(style(plots[[1]], showlegend = F), 
+                  style(plots[[2]], showlegend = F), 
+                  style(plots[[3]], showlegend = F),
+                  plots[[4]], 
+                  nrows = 4, shareX = TRUE, titleY = TRUE) %>%
+            layout(title = "Met Stations")
+        })
     
+        #SedEvent plotly output
+        output$sedPlotly <- renderPlotly({
+          vars <- names(sedDataClean[3:6])
+          plotThis <- function(var){
+            plot_ly(sedDataClean %>% mutate(datetimeUTC = ymd_hms(datetimeUTC)), 
+                    x = ~datetimeUTC, 
+                    y = as.formula(paste0("~", var)), 
+                    color = ~stationID,
+                    legendgroup=~stationID,
+                    width = 1000, height = 1000) %>%
+              add_trace(mode = "lines+markers",
+                        type = "scattergl",
+                        marker = list(size = 4),
+                        line = list(width = 2),color = ~stationID) 
+          }
+          plots <- purrr::map(vars, plotThis)
+          
+          subplot(style(plots[[1]], showlegend = F), 
+                  style(plots[[2]], showlegend = F), 
+                  style(plots[[3]], showlegend = F),
+                  plots[[4]], 
+                  nrows = 4, shareX = TRUE, titleY = TRUE) %>%
+            layout(title = "Sed Event")
+        })
 }
 
 # Run the application 
