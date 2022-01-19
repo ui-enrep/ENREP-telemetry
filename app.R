@@ -176,7 +176,11 @@ server <- function(input, output) {
             labs(title = "Met Stations", y = "")
           
           # Make plotly from above ggplot
-          ggplotly(metPlot, width = 1000, height = 1000) %>% layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
+          ggplotly(metPlot, 
+                   width = 1000, 
+                   height = 1000,
+                   dynamicTicks = TRUE) %>%
+          layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
           
         })
     
@@ -196,7 +200,11 @@ server <- function(input, output) {
             labs(title = "Sed Event", y = "") 
           
           # Make plotly from above ggplot
-          ggplotly(sedPlot, width = 1000, height = 1000) %>% layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
+          ggplotly(sedPlot, 
+                   width = 1000, 
+                   height = 1000,
+                   dynamicTicks = TRUE) %>% 
+          layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
         })
       
 }
