@@ -104,19 +104,27 @@ server <- function(input, output) {
             ".*EE304672.*" = "CW" ,
             ".*EE3048A0.*" = "CE"
         )
+
+        sedDataRaw <- read_file("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download")
+        sedDataCleanVector <- sedDataRaw %>%
+          str_split(pattern = "(?=EE)") %>% 
+          unlist() %>% 
+          str_squish() %>%
+          str_replace('"|/', "")
         
-        sedDataRaw <- scan("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download", what = "character")
-        sedDataClean <- sedDataRaw %>% 
-            matrix(., ncol = 4, byrow = TRUE) %>% 
-            data.frame() %>%
-            separate(X1, into = c("nesid", "yy", "day", "time"), sep = c(8,10,13,19)) %>%
-            separate(X4, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ",") %>%
-            mutate(yy = paste("20", yy, sep = "")) %>%
-            mutate(date = as_date(as.numeric(day), origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
-            unite("datetimeUTC", c("date", "X3"), remove = TRUE, sep = " " ) %>%
-            mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
-            select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU) %>%
-            arrange(stationID, datetimeUTC)
+        sedDataClean <- tibble(raw = sedDataCleanVector) %>%
+          filter(raw != "") %>% 
+          separate(col = raw, into = c("id_and_date", "data"), sep = c(37)) %>%
+          separate(id_and_date, into = c("nesid", "yy", "day", NA), sep = c(8,10,13,19), remove = TRUE) %>%
+          separate(data, c(NA, NA, "datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
+          separate(dataVals, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ',', remove = TRUE) %>%
+          mutate(yy = paste("20", yy, sep = "")) %>%
+          mutate(date = as_date(as.numeric(day), origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
+          unite("datetimeUTC", c("date", "datetimeUTC"), remove = TRUE, sep = " " ) %>%
+          mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
+          select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU) %>%
+          arrange(stationID, datetimeUTC) %>%
+          drop_na()
         
         sedDataRecent <- sedDataClean %>% 
             group_by(stationID) %>%
