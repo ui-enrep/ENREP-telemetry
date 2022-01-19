@@ -33,18 +33,22 @@ ui <- fluidPage(
     titlePanel("ENREP GOES Data Viewer"),
 
 sidebarLayout(
-    
+    # remove sidebar
     sidebarPanel(width = 0),
     
     mainPanel(
         DT::dataTableOutput("metTable"),
         DT::dataTableOutput("sedEventTable"),
+        br(),
+        br(),
         plotlyOutput("metPlotly",
                      height = "1000px"),
+        br(),
+        br(),
         plotlyOutput("sedPlotly",
                      height = "1000px")
     )
-)
+  )
 )
 
 
@@ -65,7 +69,7 @@ server <- function(input, output) {
                        what = "character")
         
         # a "key" to tie the NESID value to our naming convention
-        siteKey <- c(".*EE305504.*" = "BU",
+        metsiteKey <- c(".*EE305504.*" = "BU",
                      ".*EE305BD6.*" = "SU", 
                      ".*EE30609E.*" = "TL", 
                      ".*EE306E4C.*" = "CL"
@@ -84,7 +88,7 @@ server <- function(input, output) {
                    snowDepth_m = X6,
                    accumPrecip_mm = X7) %>%
             unite("datetimePST", c("date", "time"), remove = TRUE, sep = " ") %>%
-            mutate(stationID = str_replace_all(string = stationID, pattern = siteKey),
+            mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
                    voltage_V = as.numeric(voltage_V),
                    airTemp_C = as.numeric(airTemp_C), 
                    snowDepth_m = as.numeric(snowDepth_m),
@@ -97,29 +101,36 @@ server <- function(input, output) {
             filter(datetimePST == max(datetimePST))
     
     ##### SEDEVENT DATA IMPORT --------------------------------------------------------------------------------
-        sedSiteKey <- c(
-            ".*EE300578.*" = "SS" ,
-            ".*EE300BAA.*" = "SN" ,
-            ".*EE30160E.*" = "BN" ,
-            ".*EE3018DC.*" = "BS" ,
-            ".*EE302394.*" = "TE" ,
-            ".*EE302D46.*" = "TW" ,
-            ".*EE3030E2.*" = "FW" ,
-            ".*EE303E30.*" = "FE" ,
-            ".*EE304672.*" = "CW" ,
-            ".*EE3048A0.*" = "CE"
-        )
-
+  
+        # Read in data from ownCloud.  This is v2 method of reading and cleaning data.  Could change met station
+        # method to this as well.
         sedDataRaw <- read_file("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download")
+        
+        # a "key" to tie the NESID value to our naming convention
+        sedSiteKey <- c(
+          ".*EE300578.*" = "SS" ,
+          ".*EE300BAA.*" = "SN" ,
+          ".*EE30160E.*" = "BN" ,
+          ".*EE3018DC.*" = "BS" ,
+          ".*EE302394.*" = "TE" ,
+          ".*EE302D46.*" = "TW" ,
+          ".*EE3030E2.*" = "FW" ,
+          ".*EE303E30.*" = "FE" ,
+          ".*EE304672.*" = "CW" ,
+          ".*EE3048A0.*" = "CE"
+        )
+        
+        # Convert single sedDataRaw string to slightly cleaner vector of strings 
         sedDataCleanVector <- sedDataRaw %>%
           str_split(pattern = "(?=EE)") %>% 
           unlist() %>% 
           str_squish() %>%
           str_replace('"|/', "")
         
+        # Mega cleaning to final table. Arguably too much in one run.
         sedDataClean <- tibble(raw = sedDataCleanVector) %>%
           filter(raw != "") %>% 
-          separate(col = raw, into = c("id_and_date", "data"), sep = c(37)) %>%
+          separate(raw, into = c("id_and_date", "data"), sep = c(37)) %>%
           separate(id_and_date, into = c("nesid", "yy", "day", NA), sep = c(8,10,13,19), remove = TRUE) %>%
           separate(data, c(NA, NA, "datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
           separate(dataVals, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ',', remove = TRUE) %>%
@@ -128,70 +139,66 @@ server <- function(input, output) {
           unite("datetimeUTC", c("date", "datetimeUTC"), remove = TRUE, sep = " " ) %>%
           mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
           select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU) %>%
+          mutate(voltage_V = as.numeric(voltage_V),
+                 h2Temp_C = as.numeric(h2Temp_C),
+                 stage_ft = as.numeric(stage_ft),
+                 LSU = as.numeric(LSU)) %>%
           arrange(stationID, datetimeUTC) %>%
           drop_na()
         
+        # Create table of most recent data.  Cleans up table making (maybe?)
         sedDataRecent <- sedDataClean %>% 
             group_by(stationID) %>%
             filter(datetimeUTC == max(datetimeUTC))
         
     ##### OUTPUT Data Tables -------------------------------------------------------
+        
         output$metTable <- DT::renderDataTable({
             DT::datatable(metDatRecent)
         })
+        
         output$sedEventTable <- DT::renderDataTable({
             DT::datatable(sedDataRecent)
         })
         
         # Met station plotly output
         output$metPlotly <- renderPlotly({
-          vars <- names(metDatClean[3:6])
-          plotThis <- function(var){
-            plot_ly(metDatClean %>% mutate(datetimePST = ymd_hms(datetimePST)), 
-                    x = ~datetimePST, 
-                    y = as.formula(paste0("~", var)), 
-                    color = ~stationID,
-                    legendgroup=~stationID,
-                    width = 1000, height = 1000) %>%
-              add_trace(mode = "lines+markers",
-                        type = "scattergl",
-                        marker = list(size = 4),
-                        line = list(width = 2),color = ~stationID) 
-          }
-          plots <- purrr::map(vars, plotThis)
+          # Create ggplot
+          metPlot <- metDatClean %>% 
+            mutate(datetimePST = ymd_hms(datetimePST)) %>%
+            pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
+            ggplot(aes(x = datetimePST, y = value, color = stationID)) +
+            geom_line() +
+            geom_point(size = 1) +
+            theme_bw() +
+            facet_grid(row = vars(variable),
+                       scales = "free") +
+            labs(title = "Met Stations", y = "")
           
-          subplot(style(plots[[1]], showlegend = F), 
-                  style(plots[[2]], showlegend = F), 
-                  style(plots[[3]], showlegend = F),
-                  plots[[4]], 
-                  nrows = 4, shareX = TRUE, titleY = TRUE) %>%
-            layout(title = "Met Stations")
+          # Make plotly from above ggplot
+          ggplotly(metPlot, width = 1000, height = 1000) %>% layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
+          
         })
     
         #SedEvent plotly output
         output$sedPlotly <- renderPlotly({
-          vars <- names(sedDataClean[3:6])
-          plotThis <- function(var){
-            plot_ly(sedDataClean %>% mutate(datetimeUTC = ymd_hms(datetimeUTC)), 
-                    x = ~datetimeUTC, 
-                    y = as.formula(paste0("~", var)), 
-                    color = ~stationID,
-                    legendgroup=~stationID,
-                    width = 1000, height = 1000) %>%
-              add_trace(mode = "lines+markers",
-                        type = "scattergl",
-                        marker = list(size = 4),
-                        line = list(width = 2),color = ~stationID) 
-          }
-          plots <- purrr::map(vars, plotThis)
+          # Create ggplot
+          sedPlot <- sedDataClean %>% 
+            mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
+            pivot_longer(cols = -c(datetimeUTC, stationID), names_to = "variable", values_to = "value") %>%
+            ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
+            geom_line() +
+            geom_point(size = 1) +
+            theme_bw() +
+            facet_grid(row = vars(variable),
+                       scales = "free") +
+            theme(legend.position = c(0.8, 0.2)) +
+            labs(title = "Sed Event", y = "") 
           
-          subplot(style(plots[[1]], showlegend = F), 
-                  style(plots[[2]], showlegend = F), 
-                  style(plots[[3]], showlegend = F),
-                  plots[[4]], 
-                  nrows = 4, shareX = TRUE, titleY = TRUE) %>%
-            layout(title = "Sed Event")
+          # Make plotly from above ggplot
+          ggplotly(sedPlot, width = 1000, height = 1000) %>% layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
         })
+      
 }
 
 # Run the application 
