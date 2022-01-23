@@ -37,3 +37,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+rsconnect/shinyapps.io/ihellman/GOES_Data_Viewer_Shiny_App.dcf
+sandbox/reactablefmtr_tests.R
+rsconnect/shinyapps.io/enrep/GOES_Data_Viewer_Shiny_App.dcf
