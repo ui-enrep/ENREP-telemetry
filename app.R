@@ -42,11 +42,13 @@ sidebarLayout(
         br(),
         br(),
         plotlyOutput("metPlotly",
-                     height = "1000px"),
+                     height = "1000px",
+                     width = "1000px"),
         br(),
         br(),
         plotlyOutput("sedPlotly",
-                     height = "1000px")
+                     height = "1000px",
+                     width = "1000px")
     )
   )
 )
@@ -64,7 +66,7 @@ server <- function(input, output) {
             # metDatRaw <- scan(paste(normalizePath(tempdir()), "/GOES_Telemetry/GOES_raw.txt", sep = ""),
             #                what = "character")
          
-        # Read in data from ownCloud
+        # Read in data from ownCloud (note: this link is from copying the link from the download button when following the shared link)
         metDatRaw <- scan("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download",
                        what = "character")
         
@@ -100,7 +102,7 @@ server <- function(input, output) {
             group_by(stationID) %>%
             filter(datetimePST == max(datetimePST))
     
-    ##### SEDEVENT DATA IMPORT --------------------------------------------------------------------------------
+    ##### SEDEVENT DATA IMPORT  -  GOES   --------------------------------------------------------------------------
   
         # Read in data from ownCloud.  This is v2 method of reading and cleaning data.  Could change met station
         # method to this as well.
@@ -135,21 +137,36 @@ server <- function(input, output) {
           separate(data, c(NA, NA, "datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
           separate(dataVals, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ',', remove = TRUE) %>%
           mutate(yy = paste("20", yy, sep = "")) %>%
-          mutate(date = as_date(as.numeric(day), origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
+          # The "- 1" below is because GOES's says that YYYY-01-01 is Julain day 0 whereas R says its 1.  Wow.
+          mutate(date = as_date(as.numeric(day) - 1, origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
           unite("datetimeUTC", c("date", "datetimeUTC"), remove = TRUE, sep = " " ) %>%
           mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
           select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU) %>%
           mutate(voltage_V = as.numeric(voltage_V),
                  h2Temp_C = as.numeric(h2Temp_C),
                  stage_ft = as.numeric(stage_ft),
-                 LSU = as.numeric(LSU)) %>%
-          arrange(stationID, datetimeUTC) %>%
+                 LSU = as.numeric(LSU),
+                 telem_source = "GOES") %>%
+          dplyr::arrange(stationID, datetimeUTC) %>%
           drop_na()
         
         # Create table of most recent data.  Cleans up table making (maybe?)
         sedDataRecent <- sedDataClean %>% 
             group_by(stationID) %>%
             filter(datetimeUTC == max(datetimeUTC))
+        
+    ##### SEDEVENT DATA IMPORT  -  Iridium   ----------------------------------------------------------------------
+        #sedDataIridium <- read_file("NKNLINK")
+        sedDataIridium <- read_csv("https://www.northwestknowledge.net/cloud/index.php/s/rDpwrGcGlMZOhqm/download") %>%
+          mutate(datetimeUTC = as.character(datetimeUTC)) 
+          
+        
+        sedDataIridiumRecent <- sedDataIridium %>% 
+          group_by(stationID) %>%
+          filter(datetimeUTC == max(datetimeUTC))
+        
+    ##### SEDEVENT DATA MERGE  -  GOES + Iridium   ----------------------------------------------------------------------    
+        sedDataRecentMerged <- bind_rows(sedDataRecent, sedDataIridiumRecent)
         
     ##### OUTPUT Data Tables -------------------------------------------------------
         
@@ -158,7 +175,7 @@ server <- function(input, output) {
         })
         
         output$sedEventTable <- DT::renderDataTable({
-            DT::datatable(sedDataRecent)
+            DT::datatable(sedDataRecentMerged, options = list(pageLength = 25))
         })
         
         # Met station plotly output
@@ -189,7 +206,7 @@ server <- function(input, output) {
           # Create ggplot
           sedPlot <- sedDataClean %>% 
             mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
-            pivot_longer(cols = -c(datetimeUTC, stationID), names_to = "variable", values_to = "value") %>%
+            pivot_longer(cols = -c(datetimeUTC, stationID, telem_source), names_to = "variable", values_to = "value") %>%
             ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
             geom_line() +
             geom_point(size = 1) +
@@ -201,7 +218,7 @@ server <- function(input, output) {
           
           # Make plotly from above ggplot
           ggplotly(sedPlot, 
-                   width = 1000, 
+                   width =1200, 
                    height = 1000,
                    dynamicTicks = TRUE) %>% 
           layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
