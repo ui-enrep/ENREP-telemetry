@@ -25,6 +25,7 @@ library(here)
 library(DT)
 library(curl)
 library(plotly)
+library(rsconnect)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -37,18 +38,23 @@ sidebarLayout(
     sidebarPanel(width = 0),
     
     mainPanel(
-        DT::dataTableOutput("metTable"),
-        DT::dataTableOutput("sedEventTable"),
-        br(),
-        br(),
-        plotlyOutput("metPlotly",
-                     height = "1000px",
-                     width = "1000px"),
-        br(),
-        br(),
-        plotlyOutput("sedPlotly",
-                     height = "1000px",
-                     width = "1000px")
+      ## Check boxes added on 12/9/22 by Kaitlyn Strickfaden
+      ## Allow user to choose if only most recent data are shown
+      ## or all data for quality checks 
+      checkboxInput("metCheck", "Show all met station data?", value = F),
+      DT::dataTableOutput("metTable"),
+      br(),
+      br(),
+      checkboxInput("sedCheck", "Show all sed event data?", value = F),
+      DT::dataTableOutput("sedEventTable"),
+      br(),
+      br(),
+      plotlyOutput("metPlotly",
+                   height = "1000px"),
+      br(),
+      br(),
+      plotlyOutput("sedPlotly",
+                   height = "1000px")
     )
   )
 )
@@ -66,9 +72,17 @@ server <- function(input, output) {
             # metDatRaw <- scan(paste(normalizePath(tempdir()), "/GOES_Telemetry/GOES_raw.txt", sep = ""),
             #                what = "character")
          
-        # Read in data from ownCloud (note: this link is from copying the link from the download button when following the shared link)
-        metDatRaw <- scan("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download",
-                       what = "character")
+        # Read in data from ownCloud
+        metDatRaw1 <- scan("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download",
+                       what = "character") %>%
+          str_remove(., pattern = c(",")) # Remove "," from data
+        
+        
+        # Gets rid of instances when a station ID with no data is read in
+        metDatRaw1 <- metDatRaw1[!(str_starts(metDatRaw1, "EE") == T & 
+                                    (str_detect(metDatRaw1, "\\+") == F & 
+                                       str_detect(metDatRaw1, "-") == F))]
+        
         
         # a "key" to tie the NESID value to our naming convention
         metsiteKey <- c(".*EE305504.*" = "BU",
@@ -77,9 +91,35 @@ server <- function(input, output) {
                      ".*EE306E4C.*" = "CL"
                      )
         
+        ## Kaitlyn Strickfaden added checks for error messages on 9/30/22
+        ## Entries with error messages usually have "$" in them somewhere
+        ## Code below finds entries like this and flags them
+        
+        errormessages <- data.frame(ErrorIndex = which(str_detect(metDatRaw1, "\\$") == T),
+                                    ErrorMessage = metDatRaw1[str_detect(metDatRaw1, "\\$") == T])
+        
+        errormessages <- errormessages[seq(4,nrow(errormessages), 4),]
+        
+        errormessages <- errormessages %>%
+          mutate(stationID = metDatRaw1[ErrorIndex - 10],
+                 stationID = str_replace_all(string = stationID, pattern = metsiteKey),
+                 date = metDatRaw1[ErrorIndex - 9],
+                 time = metDatRaw1[ErrorIndex - 8]
+          ) %>%
+          unite("datetimePST", c("date", "time"), remove = TRUE, sep = " ")
+        
+        
+
+        metDatRaw <- metDatRaw1[str_detect(metDatRaw1, "\\$") == F]
+        
+        
+        
         # Clean up raw data (a vector of strings) to a usable dataframe.  
-        metDatClean <- str_replace(metDatRaw, pattern = c(","), replacement = "") %>%         # Remove "," from data
-            matrix(., ncol = 7, byrow = TRUE) %>%
+          metDatClean <-         
+            matrix(metDatRaw, nrow = (length(metDatRaw)/7), 
+                   ncol = 7, 
+                   byrow = TRUE
+                   ) %>%
             data.frame() %>%
             distinct() %>%
             rename(stationID = X1,
@@ -89,24 +129,43 @@ server <- function(input, output) {
                    airTemp_C = X5,
                    snowDepth_m = X6,
                    accumPrecip_mm = X7) %>%
-            unite("datetimePST", c("date", "time"), remove = TRUE, sep = " ") %>%
             mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
+                   date = as.character(ymd(date) - 1),
+                   datetimePST = str_c(date, time, sep = " "), 
                    voltage_V = as.numeric(voltage_V),
                    airTemp_C = as.numeric(airTemp_C), 
                    snowDepth_m = as.numeric(snowDepth_m),
-                   accumPrecip_mm = as.numeric(accumPrecip_mm)) %>%
-            arrange(stationID, datetimePST)
+                   accumPrecip_mm = as.numeric(accumPrecip_mm),
+                   error = case_when(str_c(stationID, datetimePST, sep = " ") %in% 
+                                       str_c(errormessages$stationID,
+                                             errormessages$datetimePST, sep = " ") ~ "Y", 
+                                     T ~ "N")) %>%
+            select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm, error) %>%
+            arrange(desc(datetimePST), stationID)
         
+          
         # Create table of most recent values (might be more efficient/cleaner to have this called elsewhere?)
         metDatRecent <- metDatClean %>% 
             group_by(stationID) %>%
             filter(datetimePST == max(datetimePST))
     
-    ##### SEDEVENT DATA IMPORT  -  GOES   --------------------------------------------------------------------------
+        
+        
+    ##### SEDEVENT DATA IMPORT - GOES --------------------------------------------------------------------------------
   
-        # Read in data from ownCloud.  This is v2 method of reading and cleaning data.  Could change met station
-        # method to this as well.
-        sedDataRaw <- read_file("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download")
+        # Read in data from ownCloud.  This is v2 method of reading and cleaning data.
+        # Could change met station method to this as well.
+
+        ## Kaitlyn Strickfaden edited read_file on 12/9/22
+        ## When a test transmission is performed, the GOES sed data have a
+        ## NULL character which stop the file from being fully read by R.
+        ## Reading in raw data and filtering the NULL character fixes issue
+        
+        sedDataRaw <- read_file_raw("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download")
+        sedDataRaw <- sedDataRaw[sedDataRaw != 00] ## 00 is raw value for NULL
+        sedDataRaw <- rawToChar(sedDataRaw)
+        
+
         
         # a "key" to tie the NESID value to our naming convention
         sedSiteKey <- c(
@@ -127,17 +186,23 @@ server <- function(input, output) {
           str_split(pattern = "(?=EE)") %>% 
           unlist() %>% 
           str_squish() %>%
-          str_replace('"|/', "")
+          str_remove('"|/')
         
-        # Mega cleaning to final table. Arguably too much in one run.
+        
+        
+        # Mega cleaning to final table. Arguably too much in one run.  
         sedDataClean <- tibble(raw = sedDataCleanVector) %>%
-          filter(raw != "") %>% 
-          separate(raw, into = c("id_and_date", "data"), sep = c(37)) %>%
+          filter(str_detect(raw, "NO DATA") == F, 
+                 str_detect(raw, "Test Transmission") == F, 
+                 raw != "") %>%
+          separate(raw, into = c("id_and_date", "data"), sep = " 0 ") %>%
+          filter(data != "0") %>%
           separate(id_and_date, into = c("nesid", "yy", "day", NA), sep = c(8,10,13,19), remove = TRUE) %>%
-          separate(data, c(NA, NA, "datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
+          separate(data, c("datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
           separate(dataVals, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ',', remove = TRUE) %>%
           mutate(yy = paste("20", yy, sep = "")) %>%
-          # The "- 1" below is because GOES's says that YYYY-01-01 is Julain day 0 whereas R says its 1.  Wow.
+          # -1 from date because R treats origin as Julian day 0 
+          # while sed station treats it as Julian day 1
           mutate(date = as_date(as.numeric(day) - 1, origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
           unite("datetimeUTC", c("date", "datetimeUTC"), remove = TRUE, sep = " " ) %>%
           mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
@@ -147,35 +212,60 @@ server <- function(input, output) {
                  stage_ft = as.numeric(stage_ft),
                  LSU = as.numeric(LSU),
                  telem_source = "GOES") %>%
-          dplyr::arrange(stationID, datetimeUTC) %>%
-          drop_na()
+          drop_na() 
+        
+      
         
         # Create table of most recent data.  Cleans up table making (maybe?)
         sedDataRecent <- sedDataClean %>% 
-            group_by(stationID) %>%
-            filter(datetimeUTC == max(datetimeUTC))
+          group_by(stationID) %>%
+          filter(datetimeUTC == max(datetimeUTC)) %>%
+          distinct()
         
-    ##### SEDEVENT DATA IMPORT  -  Iridium   ----------------------------------------------------------------------
-        #sedDataIridium <- read_file("NKNLINK")
+        
+        ##### SEDEVENT DATA IMPORT  -  Iridium   ----------------------------------------------------------------------
+
         sedDataIridium <- read_csv("https://www.northwestknowledge.net/cloud/index.php/s/rDpwrGcGlMZOhqm/download") %>%
           mutate(datetimeUTC = as.character(datetimeUTC)) 
-          
+        
         
         sedDataIridiumRecent <- sedDataIridium %>% 
           group_by(stationID) %>%
           filter(datetimeUTC == max(datetimeUTC))
         
-    ##### SEDEVENT DATA MERGE  -  GOES + Iridium   ----------------------------------------------------------------------    
-        sedDataRecentMerged <- bind_rows(sedDataRecent, sedDataIridiumRecent)
+        
+        ##### SEDEVENT DATA MERGE  -  GOES + Iridium   ----------------------------------------------------------------------    
+        
+        sedDataMerged <- bind_rows(sedDataClean, sedDataIridium) %>%
+          dplyr::arrange(desc(datetimeUTC), stationID)
+        sedDataRecentMerged <- bind_rows(sedDataRecent, sedDataIridiumRecent) %>%
+          dplyr::arrange(desc(datetimeUTC), stationID)
+        
         
     ##### OUTPUT Data Tables -------------------------------------------------------
         
-        output$metTable <- DT::renderDataTable({
-            DT::datatable(metDatRecent)
-        })
+        observe({
         
-        output$sedEventTable <- DT::renderDataTable({
-            DT::datatable(sedDataRecentMerged, options = list(pageLength = 25))
+        metCheck <- input$metCheck
+        sedCheck <- input$sedCheck
+        
+        if (metCheck == F) {
+        output$metTable <- DT::renderDataTable({
+            DT::datatable(metDatRecent, options = list(pageLength = 4))
+        }) } else {
+          output$metTable <- DT::renderDataTable({
+            DT::datatable(metDatClean, options = list(pageLength = 4)) 
+          }) }
+        
+        
+        if (sedCheck == F) {
+          output$sedEventTable <- DT::renderDataTable({
+            DT::datatable(sedDataRecentMerged, options = list(pageLength = 13))
+          }) } else {
+            output$sedEventTable <- DT::renderDataTable({
+              DT::datatable(sedDataMerged, options = list(pageLength = 13)) 
+            }) }
+        
         })
         
         # Met station plotly output
@@ -183,7 +273,7 @@ server <- function(input, output) {
           # Create ggplot
           metPlot <- metDatClean %>% 
             mutate(datetimePST = ymd_hms(datetimePST)) %>%
-            pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
+            pivot_longer(cols = -c(datetimePST, stationID, error), names_to = "variable", values_to = "value") %>%
             ggplot(aes(x = datetimePST, y = value, color = stationID)) +
             geom_line() +
             geom_point(size = 1) +
@@ -194,19 +284,22 @@ server <- function(input, output) {
           
           # Make plotly from above ggplot
           ggplotly(metPlot, 
-                   width = 1000, 
+                   width = 1400, 
                    height = 1000,
                    dynamicTicks = TRUE) %>%
-          layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
+          layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
+                               font = list(size = 24)),
+                 title = list(font = list(size = 24)))
           
         })
     
         #SedEvent plotly output
         output$sedPlotly <- renderPlotly({
           # Create ggplot
-          sedPlot <- sedDataClean %>% 
+          sedPlot <- sedDataMerged %>% 
             mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
-            pivot_longer(cols = -c(datetimeUTC, stationID, telem_source), names_to = "variable", values_to = "value") %>%
+            pivot_longer(cols = -c(datetimeUTC, stationID, telem_source), 
+                         names_to = "variable", values_to = "value") %>%
             ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
             geom_line() +
             geom_point(size = 1) +
@@ -218,10 +311,12 @@ server <- function(input, output) {
           
           # Make plotly from above ggplot
           ggplotly(sedPlot, 
-                   width =1200, 
+                   width = 1400, 
                    height = 1000,
                    dynamicTicks = TRUE) %>% 
-          layout(legend = list(orientation = "h", x = 0.5, y = 1.06))
+          layout(legend = list(orientation = "h", x = 0.2, y = 1.06,
+                               font = list(size = 24)),
+                 title = list(font = list(size = 24)))
         })
       
 }
