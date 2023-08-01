@@ -282,14 +282,16 @@ server <- function(input, output) {
                        scales = "free") +
             labs(title = "Met Stations", y = "")
           
-          # Make plotly from above ggplot
-          ggplotly(metPlot, 
-                   width = 1400, 
-                   height = 1000,
-                   dynamicTicks = TRUE) %>%
-          layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
-                               font = list(size = 24)),
-                 title = list(font = list(size = 24)))
+          metPlot <- ggplotly(metPlot, 
+                              width = 1400, 
+                              height = 1000,
+                              dynamicTicks = TRUE) %>%
+            layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
+                                 font = list(size = 24)),
+                   title = list(font = list(size = 24))) %>%
+            toWebGL()
+          
+          metPlot
           
         })
     
@@ -310,13 +312,16 @@ server <- function(input, output) {
             labs(title = "Sed Event", y = "") 
           
           # Make plotly from above ggplot
-          ggplotly(sedPlot, 
-                   width = 1400, 
-                   height = 1000,
-                   dynamicTicks = TRUE) %>% 
-          layout(legend = list(orientation = "h", x = 0.2, y = 1.06,
-                               font = list(size = 24)),
-                 title = list(font = list(size = 24)))
+          sedPlot <- ggplotly(sedPlot, 
+                              width = 1400, 
+                              height = 1000,
+                              dynamicTicks = TRUE) %>% 
+            layout(legend = list(orientation = "h", x = 0.2, y = 1.06,
+                                 font = list(size = 24)),
+                   title = list(font = list(size = 24))) %>% 
+            toWebGL()
+          
+          sedPlot
         })
       
 }
