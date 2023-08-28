@@ -5,7 +5,7 @@ rsconnect::setAccountInfo(name = 'enrep',
                           secret = '<SECRET>')
 
 rsconnect::deployApp(
-  appDir = "C://Users/stri7929/Documents/GitHub/GOES_Data_Viewer_Shiny_App-main",
+  appDir = "C://Users/Ian Hellman/Documents/GitHub/GOES_Data_Viewer_Shiny_App",
   appFiles = NULL #, you can specify which files to deploy, 
   #or keep this NULL to deploy everything
   ,
