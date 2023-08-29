@@ -63,93 +63,60 @@ sidebarLayout(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     
-    ##### MET STATION DATA IMPORT  -------------------------------------------------------------------------------------------------
-        ### An attempt at getting multiple files that automatically tarred by ownCloud.  Works locally but not on Shinapps.io.
-        ### Keeping here in case of a deployment with more file permissions.
-            # tempTAR <- tempfile(fileext = ".tar")
-            # curl_download("https://www.northwestknowledge.net/cloud/index.php/s/4l8GhFgrBa0aeOW/download", destfile = tempTAR)
-            # untar(normalizePath(tempTAR), exdir = normalizePath(tempdir()))
-            # metDatRaw <- scan(paste(normalizePath(tempdir()), "/GOES_Telemetry/GOES_raw.txt", sep = ""),
-            #                what = "character")
-         
-        # Read in data from ownCloud
-        metDatRaw1 <- scan("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download",
-                       what = "character") %>%
-          str_remove(., pattern = c(",")) # Remove "," from data
-        
-        
-        # Gets rid of instances when a station ID with no data is read in
-        metDatRaw1 <- metDatRaw1[!(str_starts(metDatRaw1, "EE") == T & 
-                                    (str_detect(metDatRaw1, "\\+") == F & 
-                                       str_detect(metDatRaw1, "-") == F))]
-        
+    ##### MET STATION DATA IMPORT  -----------------------------------------------------------------------------------------------
+
+        # Read in file from ownCloud.
+        metDataRaw <- read_file("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download")
         
         # a "key" to tie the NESID value to our naming convention
         metsiteKey <- c(".*EE305504.*" = "BU",
-                     ".*EE305BD6.*" = "SU", 
-                     ".*EE30609E.*" = "TL", 
+                     ".*EE305BD6.*" = "SU",
+                     ".*EE30609E.*" = "TL",
                      ".*EE306E4C.*" = "CL"
                      )
-        
-        ## Kaitlyn Strickfaden added checks for error messages on 9/30/22
-        ## Entries with error messages usually have "$" in them somewhere
-        ## Code below finds entries like this and flags them
-        
-        errormessages <- data.frame(ErrorIndex = which(str_detect(metDatRaw1, "\\$") == T),
-                                    ErrorMessage = metDatRaw1[str_detect(metDatRaw1, "\\$") == T])
-        
-        errormessages <- errormessages[seq(4,nrow(errormessages), 4),]
-        
-        errormessages <- errormessages %>%
-          mutate(stationID = metDatRaw1[ErrorIndex - 10],
-                 stationID = str_replace_all(string = stationID, pattern = metsiteKey),
-                 date = metDatRaw1[ErrorIndex - 9],
-                 time = metDatRaw1[ErrorIndex - 8]
-          ) %>%
-          unite("datetimePST", c("date", "time"), remove = TRUE, sep = " ")
-        
-        
 
-        metDatRaw <- metDatRaw1[str_detect(metDatRaw1, "\\$") == F]
+        # File read in is one long character string.  Here, we split it into separate 
+        # elements and remove some junk data
+        metData <- metDataRaw %>%
+          str_split(pattern = "(?=EE)") %>%                             #  split at GOES ID.
+          unlist() %>%                                                  # str_split returns list, this flattens it.
+          str_squish() %>%                                              # remove white space (and /n type characters)
+          str_remove('"|/') %>%                                         # Remove various characters and junk data
+          str_subset(pattern = "\\$", negate = T) %>%
+          str_remove_all(pattern = "\\,") %>%
+          str_replace_all(pattern = "//////", replacement = "") %>%
+          stringi::stri_remove_empty()
         
+        # Turn to dataframe and separate string into columns.
+        metData <- data.frame(dat = metData)
+        metData <- metData %>% separate_wider_delim(dat, delim = " ", 
+                                                    names = c("stationID", 
+                                                              "date", 
+                                                              "time", 
+                                                              "voltage_V", 
+                                                              "airTemp_C", 
+                                                              "snowDepth_m", 
+                                                              "accumPrecip_mm"), too_few = "align_start") %>% 
+          drop_na() %>%    # helps alleviate problems with some junk data that comes in
+          distinct()       # sometimes the same values are pulled in, here we delete duplicates.
         
-        
-        # Clean up raw data (a vector of strings) to a usable dataframe.  
-          metDatClean <-         
-            matrix(metDatRaw, nrow = (length(metDatRaw)/7), 
-                   ncol = 7, 
-                   byrow = TRUE
-                   ) %>%
-            data.frame() %>%
-            distinct() %>%
-            rename(stationID = X1,
-                   date = X2,
-                   time = X3,
-                   voltage_V = X4,
-                   airTemp_C = X5,
-                   snowDepth_m = X6,
-                   accumPrecip_mm = X7) %>%
-            mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
-                   date = as.character(ymd(date) - 1),
-                   datetimePST = str_c(date, time, sep = " "), 
-                   voltage_V = as.numeric(voltage_V),
-                   airTemp_C = as.numeric(airTemp_C), 
-                   snowDepth_m = as.numeric(snowDepth_m),
-                   accumPrecip_mm = as.numeric(accumPrecip_mm),
-                   error = case_when(str_c(stationID, datetimePST, sep = " ") %in% 
-                                       str_c(errormessages$stationID,
-                                             errormessages$datetimePST, sep = " ") ~ "Y", 
-                                     T ~ "N")) %>%
-            select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm, error) %>%
-            arrange(desc(datetimePST), stationID)
+        # Final cleaning.  set data types and organize data frame.
+        metDatClean <- metData %>%
+          mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
+                 date = as.character(ymd(date) - 1),
+                 datetimePST = str_c(date, time, sep = " "), 
+                 voltage_V = as.numeric(voltage_V),
+                 airTemp_C = as.numeric(airTemp_C), 
+                 snowDepth_m = as.numeric(snowDepth_m),
+                 accumPrecip_mm = as.numeric(accumPrecip_mm)) %>%
+          select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm) %>%
+          arrange(desc(datetimePST), stationID)
         
           
         # Create table of most recent values (might be more efficient/cleaner to have this called elsewhere?)
         metDatRecent <- metDatClean %>% 
             group_by(stationID) %>%
             filter(datetimePST == max(datetimePST))
-    
-        
         
     ##### SEDEVENT DATA IMPORT - GOES --------------------------------------------------------------------------------
   
@@ -273,7 +240,7 @@ server <- function(input, output) {
           # Create ggplot
           metPlot <- metDatClean %>% 
             mutate(datetimePST = ymd_hms(datetimePST)) %>%
-            pivot_longer(cols = -c(datetimePST, stationID, error), names_to = "variable", values_to = "value") %>%
+            pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
             ggplot(aes(x = datetimePST, y = value, color = stationID)) +
             geom_line() +
             geom_point(size = 1) +
