@@ -103,7 +103,7 @@ server <- function(input, output) {
         # Final cleaning.  set data types and organize data frame.
         metDatClean <- metData %>%
           mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
-                 date = as.character(ymd(date) - 1),
+                 date = as.character(ymd(date)),
                  datetimePST = str_c(date, time, sep = " "), 
                  voltage_V = as.numeric(voltage_V),
                  airTemp_C = as.numeric(airTemp_C), 
