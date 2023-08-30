@@ -2,7 +2,7 @@
 
 rsconnect::setAccountInfo(name = 'enrep', 
                           token = '04AF4ADD8F2B1F14CA7CBAB90647E725', 
-                          secret = '<SECRET>')
+                          secret = 'saj8VBk5rnxKcM6Y2NlLIO/ua8alTMP8sqdqXiot')
 
 rsconnect::deployApp(
   appDir = "C://Users/Ian Hellman/Documents/GitHub/GOES_Data_Viewer_Shiny_App",
