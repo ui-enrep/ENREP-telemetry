@@ -25,7 +25,6 @@ library(here)
 library(DT)
 library(curl)
 library(plotly)
-library(rsconnect)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
