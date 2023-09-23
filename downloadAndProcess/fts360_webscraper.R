@@ -7,6 +7,7 @@
 library(tidyverse)
 library(RSelenium)
 library(wdman)
+library(here)
 
 # Start a docker container with chrome. 
 
@@ -49,8 +50,8 @@ remDr <- RSelenium::remoteDriver(remoteServerAddr = "localhost",
                                  browserName = "chrome")
 
 # some VERY secure entry of usernames
-username <- "username@email.com"
-pass <- "password"
+username <- "uienrep@gmail.com"
+pass <- "ftsenrep"
 
 # Go to login page
 remDr$open()
@@ -99,6 +100,7 @@ scrapefts <- function(stationID, siteurl){
                stationID = stationID,
                telem_source = "Iridium") %>%
     mutate(datetimeUTC = lubridate::mdy_hms(datetimeUTC)) %>%
+    mutate(datetimeUTC = as.character(datetimeUTC)) %>%
     relocate(stationID, .before = datetimeUTC)
   print(dat)
   return(dat)
@@ -111,13 +113,13 @@ new_data <- pmap_df(stationdf, scrapefts)
 ###  Merge with existing data or export new --------------------------------------------------------------------
 
 # Location of stored data (either existing or to be saved)
-dataFileLocation <- "/home/enrep/ownCloud/ENREP_Shared/GOES_Telemetry/iridium_sed_event_data.csv"
+dataFileLocation <- here("data/iridium_sed_event_data.csv")
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
 # merge with newly downloaded data.
 if (file.exists(dataFileLocation)){
   # read In existing data
-  existing_data <- read_csv(dataFileLocation) %>%
+  existing_data <- read_csv(dataFileLocation, show_col_types = FALSE) %>%
     mutate(datetimeUTC = as.character(datetimeUTC))
   
   # new_data and existing data somehow have different datatypes which seems impossible
