@@ -2,6 +2,7 @@ library(here)
 library(stringr)
 library(dplyr)
 library(tidyr)
+library(readr)
 library(lubridate)
 
 #start of met data retrieval and cleaning
@@ -62,13 +63,12 @@ dataFileLocation <- here("data/goes_met_data.csv")
 if (file.exists(dataFileLocation)){
   # read In existing data
   existing_data <- read_csv(dataFileLocation, show_col_types = FALSE) %>%
-    mutate(datetimeUTC = as.character(datetimeUTC))
+    mutate(datetimePST = as.character(datetimePST))
   
   # new_data and existing data somehow have different datatypes which seems impossible
   # given they are in same table.  hack fix is as.character below.  very weird.
   merged_data <- bind_rows(existing_data, metDatClean) %>% 
-    mutate(datetimeUTC = as.character(datetimeUTC),
-           stage_ft = as.character(stage_ft)) %>%
+    mutate(datetimePST = as.character(datetimePST)) %>%
     distinct()
   
   write.csv(merged_data, dataFileLocation, row.names = FALSE)
