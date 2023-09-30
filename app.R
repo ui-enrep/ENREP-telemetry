@@ -19,6 +19,9 @@
 
 library(shiny)
 library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
 library(lubridate)
 library(glue)
 library(here)
@@ -64,53 +67,10 @@ server <- function(input, output) {
     
     ##### MET STATION DATA IMPORT  -----------------------------------------------------------------------------------------------
 
-        # Read in file from ownCloud.
-        metDataRaw <- read_file("https://www.northwestknowledge.net/cloud/index.php/s/rA5VkxMqzSmsFxT/download")
-        
-        # a "key" to tie the NESID value to our naming convention
-        metsiteKey <- c(".*EE305504.*" = "BU",
-                     ".*EE305BD6.*" = "SU",
-                     ".*EE30609E.*" = "TL",
-                     ".*EE306E4C.*" = "CL"
-                     )
-
-        # File read in is one long character string.  Here, we split it into separate 
-        # elements and remove some junk data
-        metData <- metDataRaw %>%
-          str_split(pattern = "(?=EE)") %>%                             #  split at GOES ID.
-          unlist() %>%                                                  # str_split returns list, this flattens it.
-          str_squish() %>%                                              # remove white space (and /n type characters)
-          str_remove('"|/') %>%                                         # Remove various characters and junk data
-          str_subset(pattern = "\\$", negate = T) %>%
-          str_remove_all(pattern = "\\,") %>%
-          str_replace_all(pattern = "//////", replacement = "") %>%
-          stringi::stri_remove_empty()
-        
-        # Turn to dataframe and separate string into columns.
-        metData <- data.frame(dat = metData)
-        metData <- metData %>% separate_wider_delim(dat, delim = " ", 
-                                                    names = c("stationID", 
-                                                              "date", 
-                                                              "time", 
-                                                              "voltage_V", 
-                                                              "airTemp_C", 
-                                                              "snowDepth_m", 
-                                                              "accumPrecip_mm"), too_few = "align_start") %>% 
-          drop_na() %>%    # helps alleviate problems with some junk data that comes in
-          distinct()       # sometimes the same values are pulled in, here we delete duplicates.
-        
-        # Final cleaning.  set data types and organize data frame.
-        metDatClean <- metData %>%
-          mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
-                 date = as.character(ymd(date)),
-                 datetimePST = str_c(date, time, sep = " "), 
-                 voltage_V = as.numeric(voltage_V),
-                 airTemp_C = as.numeric(airTemp_C), 
-                 snowDepth_m = as.numeric(snowDepth_m),
-                 accumPrecip_mm = as.numeric(accumPrecip_mm)) %>%
-          select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm) %>%
-          arrange(desc(datetimePST), stationID)
-        
+        # Read in pre-cleaned GOES Met Data
+        metDataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
+        metDatClean <- read_csv(metDataFileLocation, show_col_types = FALSE) %>%
+          mutate(datetimePST = as.character(datetimePST))
           
         # Create table of most recent values (might be more efficient/cleaner to have this called elsewhere?)
         metDatRecent <- metDatClean %>% 
@@ -121,66 +81,10 @@ server <- function(input, output) {
   
         # Read in data from ownCloud.  This is v2 method of reading and cleaning data.
         # Could change met station method to this as well.
-
-        ## Kaitlyn Strickfaden edited read_file on 12/9/22
-        ## When a test transmission is performed, the GOES sed data have a
-        ## NULL character which stop the file from being fully read by R.
-        ## Reading in raw data and filtering the NULL character fixes issue
-        
-        sedDataRaw <- read_file_raw("https://www.northwestknowledge.net/cloud/index.php/s/Ahzqw7G1s1riFVG/download")
-        sedDataRaw <- sedDataRaw[sedDataRaw != 00] ## 00 is raw value for NULL
-        sedDataRaw <- rawToChar(sedDataRaw)
-        
-
-        
-        # a "key" to tie the NESID value to our naming convention
-        sedSiteKey <- c(
-          ".*EE300578.*" = "SS" ,
-          ".*EE300BAA.*" = "SN" ,
-          ".*EE30160E.*" = "BN" ,
-          ".*EE3018DC.*" = "BS" ,
-          ".*EE302394.*" = "TE" ,
-          ".*EE302D46.*" = "TW" ,
-          ".*EE3030E2.*" = "FW" ,
-          ".*EE303E30.*" = "FE" ,
-          ".*EE304672.*" = "CW" ,
-          ".*EE3048A0.*" = "CE"
-        )
-        
-        # Convert single sedDataRaw string to slightly cleaner vector of strings 
-        sedDataCleanVector <- sedDataRaw %>%
-          str_split(pattern = "(?=EE)") %>% 
-          unlist() %>% 
-          str_squish() %>%
-          str_remove('"|/')
-        
-        
-        
-        # Mega cleaning to final table. Arguably too much in one run.  
-        sedDataClean <- tibble(raw = sedDataCleanVector) %>%
-          filter(str_detect(raw, "NO DATA") == F, 
-                 str_detect(raw, "Test Transmission") == F, 
-                 raw != "") %>%
-          separate(raw, into = c("id_and_date", "data"), sep = " 0 ") %>%
-          filter(data != "0") %>%
-          separate(id_and_date, into = c("nesid", "yy", "day", NA), sep = c(8,10,13,19), remove = TRUE) %>%
-          separate(data, c("datetimeUTC", "dataVals"), sep = " ", remove = TRUE) %>%
-          separate(dataVals, c("voltage_V", "h2Temp_C", "stage_ft", "LSU"), sep = ',', remove = TRUE) %>%
-          mutate(yy = paste("20", yy, sep = "")) %>%
-          # -1 from date because R treats origin as Julian day 0 
-          # while sed station treats it as Julian day 1
-          mutate(date = as_date(as.numeric(day) - 1, origin = ymd(paste0(yy, "-01-01", sep = "")))) %>%
-          unite("datetimeUTC", c("date", "datetimeUTC"), remove = TRUE, sep = " " ) %>%
-          mutate(stationID = str_replace_all(string = nesid, pattern = sedSiteKey)) %>%
-          select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU) %>%
-          mutate(voltage_V = as.numeric(voltage_V),
-                 h2Temp_C = as.numeric(h2Temp_C),
-                 stage_ft = as.numeric(stage_ft),
-                 LSU = as.numeric(LSU),
-                 telem_source = "GOES") %>%
-          drop_na() 
-        
-      
+        # Read in pre-cleaned GOES Met Data
+        sedDataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_sedevent_data.csv"
+        sedDataClean <- read_csv(sedDataFileLocation, show_col_types = FALSE) %>%
+          mutate(datetimeUTC = as.character(datetimeUTC))
         
         # Create table of most recent data.  Cleans up table making (maybe?)
         sedDataRecent <- sedDataClean %>% 

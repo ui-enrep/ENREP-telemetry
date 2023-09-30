@@ -1,13 +1,12 @@
-library(here)
-library(stringr)
 library(dplyr)
-library(tidyr)
-library(readr)
 library(lubridate)
+library(stringr)
+library(tidyr)
+library(here)
+library(readr)
 
-#start of met data retrieval and cleaning
-metDataRaw <- system("/home/ihellman/enrep/LrgsClient/bin/getDcpMessages -h lrgseddn1.cr.usgs.gov -u enrep1 -f /home/ihellman/enrep/LrgsClient/MessageBrowser_Met.sc -P yrqy-XWZB-96", 
-              intern = TRUE)
+metDataRaw <- system("/home/ihellman/enrep/LrgsClient/bin/getDcpMessages -h lrgseddn1.cr.usgs.gov -u enrep1 -f /home/ihellman/enrep/LrgsClient/MessageBrowser_Met.sc -P yrqy-XWZB-96",
+                    intern = TRUE)
 
 # a "key" to tie the NESID value to our naming convention
 metsiteKey <- c(".*EE305504.*" = "BU",
@@ -43,7 +42,7 @@ metData <- metData %>% separate_wider_delim(dat, delim = " ",
   distinct()       # sometimes the same values are pulled in, here we delete duplicates.
 
 # Final cleaning.  set data types and organize data frame.
-metDatClean <- metData %>%
+metDataClean <- metData %>%
   mutate(stationID = str_replace_all(string = stationID, pattern = metsiteKey),
          date = as.character(ymd(date)),
          datetimePST = str_c(date, time, sep = " "), 
@@ -53,6 +52,7 @@ metDatClean <- metData %>%
          accumPrecip_mm = as.numeric(accumPrecip_mm)) %>%
   select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm) %>%
   arrange(desc(datetimePST), stationID)
+
 
 # Location of stored data (either existing or to be saved)
 #dataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
@@ -67,14 +67,12 @@ if (file.exists(dataFileLocation)){
   
   # new_data and existing data somehow have different datatypes which seems impossible
   # given they are in same table.  hack fix is as.character below.  very weird.
-  merged_data <- bind_rows(existing_data, metDatClean) %>% 
+  merged_data <- bind_rows(existing_data, metDataClean) %>% 
     mutate(datetimePST = as.character(datetimePST)) %>%
     distinct()
   
   write.csv(merged_data, dataFileLocation, row.names = FALSE)
   
 } else {
-  write.csv(metDatClean, dataFileLocation, row.names = FALSE)
+  write.csv(metDataClean, dataFileLocation, row.names = FALSE)
 }
-
-
