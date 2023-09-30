@@ -22,9 +22,10 @@ fts_scrape_running <- system("docker ps", intern = TRUE) %>% str_detect("fts_scr
 
 # If fts_scrape container is running, kill it.  If not, start it.
 if (fts_scrape_running == TRUE){
-  system("docker kill fts_scrape")
-  system("docker rm fts_scrape") # remove docker.  This prevents lots of dead docker instances from piling up.
-  system("docker run --name fts_scrape -d -p 4445:4444 --shm-size=2g selenium/standalone-chrome:111.0")
+  #system("docker kill fts_scrape")
+  #system("docker rm fts_scrape") # remove docker.  This prevents lots of dead docker instances from piling up.
+  #system("docker run --name fts_scrape -d -p 4445:4444 --shm-size=2g selenium/standalone-chrome:111.0")
+  print("Selenium docker already running")
 } else {
   system("docker run --name fts_scrape -d -p 4445:4444 --shm-size=2g selenium/standalone-chrome:111.0")
 }
@@ -142,5 +143,5 @@ if (file.exists(dataFileLocation)){
 remDr$close()
 
 # kill docker container process
-system("docker kill fts_scrape")
-system("docker rm fts_scrape")
+#system("docker kill fts_scrape")
+#system("docker rm fts_scrape")
