@@ -53,8 +53,6 @@ metDataClean <- metData %>%
   select(stationID, datetimePST, voltage_V, airTemp_C, snowDepth_m, accumPrecip_mm) %>%
   arrange(desc(datetimePST), stationID)
 
-print(metDataClean)
-
 
 # Location of stored data (either existing or to be saved)
 #dataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
