@@ -17,17 +17,13 @@
 #  3) Incorporate the Iridium telemetry.  That would allow this platform to be better in many ways than FTS 360.
 #
 
-library(shiny)
-library(tidyverse)
 library(readr)
 library(dplyr)
+library(shiny)
+library(DT)
+library(plotly)
 library(ggplot2)
 library(lubridate)
-library(glue)
-library(here)
-library(DT)
-library(curl)
-library(plotly)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -72,21 +68,19 @@ server <- function(input, output) {
         metDatClean <- read_csv(metDataFileLocation, show_col_types = FALSE) %>%
           mutate(datetimePST = as.character(datetimePST))
           
-        # Create table of most recent values (might be more efficient/cleaner to have this called elsewhere?)
+        # Create table of most recent values.
         metDatRecent <- metDatClean %>% 
             group_by(stationID) %>%
             filter(datetimePST == max(datetimePST))
         
     ##### SEDEVENT DATA IMPORT - GOES --------------------------------------------------------------------------------
   
-        # Read in data from ownCloud.  This is v2 method of reading and cleaning data.
-        # Could change met station method to this as well.
-        # Read in pre-cleaned GOES Met Data
+        # Read in pre-cleaned SedEvent Data
         sedDataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_sedevent_data.csv"
         sedDataClean <- read_csv(sedDataFileLocation, show_col_types = FALSE) %>%
           mutate(datetimeUTC = as.character(datetimeUTC))
         
-        # Create table of most recent data.  Cleans up table making (maybe?)
+        # Create table of most recent data.
         sedDataRecent <- sedDataClean %>% 
           group_by(stationID) %>%
           filter(datetimeUTC == max(datetimeUTC)) %>%
@@ -95,7 +89,8 @@ server <- function(input, output) {
         
         ##### SEDEVENT DATA IMPORT  -  Iridium   ----------------------------------------------------------------------
 
-        sedDataIridium <- read_csv("https://www.northwestknowledge.net/cloud/index.php/s/FaeewtiEL3epUPz/download") %>%
+        sedDataIridium <- read_csv("/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/iridium_sedevent_data.csv",
+                                   show_col_types = FALSE) %>%
           mutate(datetimeUTC = as.character(datetimeUTC)) 
         
         
