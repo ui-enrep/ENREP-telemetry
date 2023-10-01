@@ -1,21 +1,5 @@
 #  ENREP GOES Data Viewer
-#  Ian Hellman
-#  12-Oct-2021
-#
-#  This app pulls, cleans, and displays raw GOES telemetry data.  The data used currently is simply pulled from
-#  the project's ownCloud shared drive (ENREP_Shared).  The actually downloading of raw goes data is done on
-#  a linux machine which retrieves GOES data from NOAA every 12 hours via the LRGS command line tools.  From
-#  there it is sync to teh ENREP_Shared folder.  
-#
-#  Future goals:
-#  1) Have this app do all of the work using the Java LRGS command line tools.  Not sure if this is even possible
-#     if you are hosting the app on shinyapps.io
-#  2) Currently, the app can only reach out and get a single shared text file that is being appended to on ownCloud.
-#     If you try to download a folder, it gets a .tar file.  This is manageable on a local shiny server but for 
-#     some reason (file permissions I think) it does not work on shinyapps.io.  The code where this worked locally is
-#     Commented out in the import section below.
-#  3) Incorporate the Iridium telemetry.  That would allow this platform to be better in many ways than FTS 360.
-#
+
 
 library(readr)
 library(dplyr)
@@ -29,7 +13,7 @@ library(lubridate)
 ui <- fluidPage(
 
     # Application title
-    titlePanel("ENREP GOES Data Viewer"),
+    titlePanel("ENREP Telemetry"),
 
 sidebarLayout(
     # remove sidebar
