@@ -4,7 +4,12 @@
 # This script extracts Iridium telemetry data from the FTS360 website by  navigating
 # to each basin's page and copying the table of current values.
 
-library(tidyverse)
+#library(tidyverse)
+library(dplyr)
+library(stringr)
+library(purrr)
+library(tibble)
+library(readr)
 library(RSelenium)
 library(wdman)
 library(here)
