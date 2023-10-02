@@ -3,6 +3,7 @@
 
 library(readr)
 library(dplyr)
+library(tidyr)
 library(shiny)
 library(DT)
 library(plotly)
