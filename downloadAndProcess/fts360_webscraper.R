@@ -12,7 +12,6 @@ library(tibble)
 library(readr)
 library(RSelenium)
 library(wdman)
-library(here)
 
 # Start a docker container with chrome. 
 
@@ -32,7 +31,7 @@ if (fts_scrape_running == TRUE){
   #system("docker run --name fts_scrape -d -p 4445:4444 --shm-size=2g selenium/standalone-chrome:111.0")
   print("Selenium docker already running")
 } else {
-  system("docker run --name fts_scrape -d -p 4445:4444 --shm-size=2g selenium/standalone-chrome:111.0")
+  system("docker run --name fts_scrape -d -p 4445:4444 -e JAVA_OPTS=-Dselenium.LOGGER.level=WARNING --shm-size=2g selenium/standalone-chrome:111.0")
 }
 
 Sys.sleep(5)
@@ -119,7 +118,6 @@ new_data <- pmap_df(stationdf, scrapefts)
 ###  Merge with existing data or export new --------------------------------------------------------------------
 
 # Location of stored data (either existing or to be saved)
-#dataFileLocation <- here("data/iridium_sedevent_data.csv")
 dataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/iridium_sedevent_data.csv"
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
