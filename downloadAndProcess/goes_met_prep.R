@@ -2,7 +2,6 @@ library(dplyr)
 library(lubridate)
 library(stringr)
 library(tidyr)
-library(here)
 library(readr)
 
 metDataRaw <- system("/home/ihellman/enrep/LrgsClient/bin/getDcpMessages -h lrgseddn1.cr.usgs.gov -u enrep1 -f /home/ihellman/enrep/LrgsClient/MessageBrowser_Met.sc -P yrqy-XWZB-96",
