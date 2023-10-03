@@ -119,7 +119,8 @@ new_data <- pmap_df(stationdf, scrapefts)
 ###  Merge with existing data or export new --------------------------------------------------------------------
 
 # Location of stored data (either existing or to be saved)
-dataFileLocation <- here("data/iridium_sedevent_data.csv")
+#dataFileLocation <- here("data/iridium_sedevent_data.csv")
+dataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/iridium_sedevent_data.csv"
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
 # merge with newly downloaded data.

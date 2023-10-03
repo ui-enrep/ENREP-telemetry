@@ -56,7 +56,8 @@ metDataClean <- metData %>%
 
 # Location of stored data (either existing or to be saved)
 #dataFileLocation <- "/srv/shiny-server/sample-apps/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
-dataFileLocation <- here("data/goes_met_data.csv")
+#dataFileLocation <- here("data/goes_met_data.csv")
+dataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
 # merge with newly downloaded data.
