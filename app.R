@@ -12,7 +12,6 @@ library(lubridate)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
     # Application title
     titlePanel("ENREP Telemetry"),
 
@@ -21,17 +20,14 @@ sidebarLayout(
     sidebarPanel(width = 0),
     
     mainPanel(
-      ## Check boxes added on 12/9/22 by Kaitlyn Strickfaden
-      ## Allow user to choose if only most recent data are shown
-      ## or all data for quality checks 
-      checkboxInput("metCheck", "Show all met station data?", value = F),
         DT::dataTableOutput("metTable"),
         br(),
         br(),
-        checkboxInput("sedCheck", "Show all sed event data?", value = F),
         DT::dataTableOutput("sedEventTable"),
       br(),
       br(),
+      checkboxGroupInput("plotCheckGroup", label = h3("Select Data to Plot"), 
+                         choices = list("Met Stations" = "met", "SedEvent" = "sed")),
       plotlyOutput("metPlotly",
                    height = "1000px"),
       br(),
@@ -94,87 +90,83 @@ server <- function(input, output) {
         
     ##### OUTPUT Data Tables -------------------------------------------------------
         
-        observe({
-        
-        metCheck <- input$metCheck
-        sedCheck <- input$sedCheck
-        
-        if (metCheck == F) {
         output$metTable <- DT::renderDataTable({
-            DT::datatable(metDatRecent, options = list(pageLength = 4))
-        }) } else {
-          output$metTable <- DT::renderDataTable({
-            DT::datatable(metDatClean, options = list(pageLength = 4)) 
-          }) }
+          DT::datatable(metDatRecent, options = list(pageLength = 4)) 
+          })
+  
+        output$sedEventTable <- DT::renderDataTable({
+          DT::datatable(sedDataRecentMerged, options = list(pageLength = 13)) 
+          }) 
+          
+    ##### OUTPUT Plots -------------------------------------------------------      
         
+        # Both plots are within observe.  Not sure this is the cleanest way to do
+        # this but it works.
+        observe({
+          
+        plotCheckGroup <- input$plotCheckGroup
         
-        if (sedCheck == F) {
-          output$sedEventTable <- DT::renderDataTable({
-            DT::datatable(sedDataRecentMerged, options = list(pageLength = 13))
+        ### Sed Event Plots --------------------------------------------------
+        
+        if ('sed' %in% plotCheckGroup) {
+          output$sedPlotly <- renderPlotly({
+            # Create ggplot
+            sedPlot <- sedDataMerged %>%
+              mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
+              pivot_longer(cols = -c(datetimeUTC, stationID, telem_source),
+                           names_to = "variable", values_to = "value") %>%
+              ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
+              geom_line() +
+              geom_point(size = 1) +
+              theme_bw() +
+              facet_grid(row = vars(variable),
+                         scales = "free") +
+              theme(legend.position = c(0.8, 0.2)) +
+              labs(title = "Sed Event", y = "")
+
+            # Make plotly from above ggplot
+            sedPlot <- ggplotly(sedPlot,
+                                width = 1400,
+                                height = 1000,
+                                dynamicTicks = TRUE) %>%
+              layout(legend = list(orientation = "h", x = 0.2, y = 1.06,
+                                   font = list(size = 24)),
+                     title = list(font = list(size = 24))) %>%
+              toWebGL()
+
+            sedPlot
           }) } else {
-            output$sedEventTable <- DT::renderDataTable({
-              DT::datatable(sedDataMerged, options = list(pageLength = 13)) 
-            }) }
+            output$sedPlotly <- renderPlotly({})}
+          
+        ### Met Station Plot ---------------------------------------------------
         
+          if ('met' %in% plotCheckGroup) {
+            output$metPlotly <- renderPlotly({
+              # Create ggplot
+              metPlot <- metDatClean %>%
+                mutate(datetimePST = ymd_hms(datetimePST)) %>%
+                pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
+                ggplot(aes(x = datetimePST, y = value, color = stationID)) +
+                geom_line() +
+                geom_point(size = 1) +
+                theme_bw() +
+                facet_grid(row = vars(variable),
+                           scales = "free") +
+                labs(title = "Met Stations", y = "")
+              
+              metPlot <- ggplotly(metPlot,
+                                  width = 1400,
+                                  height = 1000,
+                                  dynamicTicks = TRUE) %>%
+                layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
+                                     font = list(size = 24)),
+                       title = list(font = list(size = 24))) %>%
+                toWebGL()
+              
+              metPlot
+            }) } else {
+              output$metPlotly <- renderPlotly({})}
         })
-        
-        
-        # Met station plotly output
-        output$metPlotly <- renderPlotly({
-          # Create ggplot
-          metPlot <- metDatClean %>% 
-            mutate(datetimePST = ymd_hms(datetimePST)) %>%
-            pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
-            ggplot(aes(x = datetimePST, y = value, color = stationID)) +
-            geom_line() +
-            geom_point(size = 1) +
-            theme_bw() +
-            facet_grid(row = vars(variable),
-                       scales = "free") +
-            labs(title = "Met Stations", y = "")
-          
-          metPlot <- ggplotly(metPlot, 
-                              width = 1400, 
-                              height = 1000,
-                              dynamicTicks = TRUE) %>%
-            layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
-                                 font = list(size = 24)),
-                   title = list(font = list(size = 24))) %>%
-            toWebGL()
-          
-          metPlot
-          
-        })
-    
-        #SedEvent plotly output
-        output$sedPlotly <- renderPlotly({
-          # Create ggplot
-          sedPlot <- sedDataMerged %>% 
-            mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
-            pivot_longer(cols = -c(datetimeUTC, stationID, telem_source), 
-                         names_to = "variable", values_to = "value") %>%
-            ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
-            geom_line() +
-            geom_point(size = 1) +
-            theme_bw() +
-            facet_grid(row = vars(variable),
-                       scales = "free") +
-            theme(legend.position = c(0.8, 0.2)) +
-            labs(title = "Sed Event", y = "") 
-          
-          # Make plotly from above ggplot
-          sedPlot <- ggplotly(sedPlot, 
-                              width = 1400, 
-                              height = 1000,
-                              dynamicTicks = TRUE) %>% 
-            layout(legend = list(orientation = "h", x = 0.2, y = 1.06,
-                                 font = list(size = 24)),
-                   title = list(font = list(size = 24))) %>% 
-            toWebGL()
-          
-          sedPlot
-        })
-      
 }
 
 # Run the application 
