@@ -1,3 +1,5 @@
+library(gt)
+
 key <- tribble(
   ~stationID, ~basinPair,
   "BN", "Blue Grouse",
@@ -11,6 +13,10 @@ key <- tribble(
   "CE", "Coxit Creek",
   "CW", "Coxit Creek"
 )
+
+met <- read_csv("/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/goes_sedevent_data.csv")
+
+dat <- left_join(met, key, by = "stationID")
 
 dat %>%
   group_by(basinPair) %>%

@@ -25,11 +25,11 @@ sidebarLayout(
       ## Allow user to choose if only most recent data are shown
       ## or all data for quality checks 
       checkboxInput("metCheck", "Show all met station data?", value = F),
-      DT::dataTableOutput("metTable"),
-      br(),
-      br(),
-      checkboxInput("sedCheck", "Show all sed event data?", value = F),
-      DT::dataTableOutput("sedEventTable"),
+        DT::dataTableOutput("metTable"),
+        br(),
+        br(),
+        checkboxInput("sedCheck", "Show all sed event data?", value = F),
+        DT::dataTableOutput("sedEventTable"),
       br(),
       br(),
       plotlyOutput("metPlotly",
@@ -117,6 +117,7 @@ server <- function(input, output) {
             }) }
         
         })
+        
         
         # Met station plotly output
         output$metPlotly <- renderPlotly({
