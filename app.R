@@ -27,7 +27,7 @@ sidebarLayout(
       br(),
       br(),
       checkboxGroupInput("plotCheckGroup", label = h3("Select Data to Plot"), 
-                         choices = list("Met Stations" = "met", "SedEvent" = "sed")),
+                         choices = list("Met Station" = "met", "SedEvent" = "sed")),
       plotlyOutput("metPlotly",
                    height = "1000px"),
       br(),
