@@ -42,11 +42,11 @@ Sys.sleep(5)
 
 # List of iridium pages on FTS360.  Used to iterate,
 stationdf <- tribble(
-  ~stationID, ~siteurl,
-  "BN", "https://360.ftsinc.com/218/station/6160c6ba64699463087282b2",
-  "FW", "https://360.ftsinc.com/218/station/6160c6b964699463087281dd",
-  "TE", "https://360.ftsinc.com/218/station/6160c6b964699463087281bc",
-  "TW", "https://360.ftsinc.com/218/station/6160c6ba64699463087282b5") %>% 
+  ~stationID, ~siteurl, ~basinPair,
+  "BN", "https://360.ftsinc.com/218/station/6160c6ba64699463087282b2", "Blue Grouse",
+  "FW", "https://360.ftsinc.com/218/station/6160c6b964699463087281dd", "Fish Creek",
+  "TE", "https://360.ftsinc.com/218/station/6160c6b964699463087281bc", "Tripps Knob",
+  "TW", "https://360.ftsinc.com/218/station/6160c6ba64699463087282b5", "Tripps Knob") %>% 
   data.frame()
 
 # Create connection to chrome running in docker container.
@@ -74,7 +74,7 @@ remDr$findElements("xpath", '//*[(@id = "login-button")]')[[1]]$clickElement()
 Sys.sleep(5)
 
 # Navigate to each site's url, scrape data from latest data table, and clean the data
-scrapefts <- function(stationID, siteurl){
+scrapefts <- function(stationID, siteurl, basinPair){
   
   #navgiate to page.
   remDr$navigate(siteurl)
@@ -104,10 +104,13 @@ scrapefts <- function(stationID, siteurl){
     add_column(datetimeUTC = dateTimeExtracted, .before = TRUE,
                stationID = stationID,
                telem_source = "Iridium") %>%
+    left_join(stationdf, by = "stationID") %>%
     mutate(datetimeUTC = lubridate::mdy_hms(datetimeUTC)) %>%
     mutate(datetimeUTC = as.character(datetimeUTC)) %>%
-    relocate(stationID, .before = datetimeUTC)
+    select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU, telem_source, basinPair)
+  
   print(dat)
+  
   return(dat)
 }
 
@@ -147,5 +150,5 @@ if (file.exists(dataFileLocation)){
 remDr$close()
 
 # kill docker container process
-#system("docker kill fts_scrape")
-#system("docker rm fts_scrape")
+system("docker kill fts_scrape")
+system("docker rm fts_scrape")
