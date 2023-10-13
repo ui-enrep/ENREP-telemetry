@@ -9,6 +9,7 @@ library(DT)
 library(plotly)
 library(ggplot2)
 library(lubridate)
+library(gt)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -20,10 +21,20 @@ sidebarLayout(
     sidebarPanel(width = 0),
     
     mainPanel(
-        DT::dataTableOutput("metTable"),
-        br(),
-        br(),
-        DT::dataTableOutput("sedEventTable"),
+      tabsetPanel(
+        tabPanel("GT",
+                 gt_output(outputId = "gtSedTable"),
+                 br(),
+                 br(),
+                 gt_output(outputId = "gtMetTable")
+        ),
+        tabPanel("DT",
+          DT::dataTableOutput("metTable"),
+          br(),
+          br(),
+          DT::dataTableOutput("sedEventTable")
+        )
+      ),
       br(),
       br(),
       checkboxGroupInput("plotCheckGroup", label = h3("Select Data to Plot"), 
@@ -90,6 +101,7 @@ server <- function(input, output) {
         
     ##### OUTPUT Data Tables -------------------------------------------------------
         
+        ## DT Tables
         output$metTable <- DT::renderDataTable({
           DT::datatable(metDatRecent, options = list(pageLength = 4)) 
           })
@@ -97,6 +109,44 @@ server <- function(input, output) {
         output$sedEventTable <- DT::renderDataTable({
           DT::datatable(sedDataRecentMerged, options = list(pageLength = 13)) 
           }) 
+        
+        # GT Tables
+        output$gtMetTable <- render_gt({
+          metKey <- tribble(
+          ~stationID, ~stationName,
+          "SU", "Springdale Upper",
+          "BU", "Blue Grouse Upper",
+          "TL", "Trips Lower",
+          "CL", "Coxit Lower"
+        )
+        
+        metdat <- left_join(metDatRecent, metKey, by = "stationID")
+        
+        metdat %>%
+          ungroup() %>%
+          select(-'stationID') %>%
+          gt(rowname_col = "stationName") %>%
+          cols_align(align = "center") %>%
+          cols_align(
+            align = "right",
+            columns = stationName) %>%
+          opt_horizontal_padding(scale = 3) %>%
+          tab_header(title = "Met Station")
+        })
+        output$gtSedTable <- render_gt({
+          
+          sedDataRecentMerged %>%
+            group_by(basinPair) %>%
+            gt(rowname_col = "stationID", groupname_col = "basinPair") %>%
+            cols_align(align = "center") %>%
+            opt_horizontal_padding(scale = 3) %>%
+            tab_header(title = "Sed Event") %>%
+            tab_style(
+              style = cell_fill(color = "gray85"),
+              locations = cells_row_groups(groups = everything()))
+          
+        })
+        
           
     ##### OUTPUT Plots -------------------------------------------------------      
         
