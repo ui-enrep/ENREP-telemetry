@@ -163,7 +163,7 @@ server <- function(input, output) {
             # Create ggplot
             sedPlot <- sedDataMerged %>%
               mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
-              pivot_longer(cols = -c(datetimeUTC, stationID, telem_source),
+              pivot_longer(cols = -c(datetimeUTC, stationID, telem_source, basinPair),
                            names_to = "variable", values_to = "value") %>%
               ggplot(aes(x = datetimeUTC, y = value, color = stationID)) +
               geom_line() +
