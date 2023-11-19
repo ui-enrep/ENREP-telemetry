@@ -52,7 +52,7 @@ server <- function(input, output) {
     ##### MET STATION DATA IMPORT  -----------------------------------------------------------------------------------------------
 
         # Read in pre-cleaned GOES Met Data
-        metDataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/goes_met_data.csv"
+        metDataFileLocation <- "/srv/shiny-server/ENREP-telemetry/data/goes_met_data.csv"
         metDatClean <- read_csv(metDataFileLocation, show_col_types = FALSE) %>%
           mutate(datetimePST = as.character(datetimePST))
           
@@ -64,7 +64,7 @@ server <- function(input, output) {
     ##### SEDEVENT DATA IMPORT - GOES --------------------------------------------------------------------------------
   
         # Read in pre-cleaned SedEvent Data
-        sedDataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/goes_sedevent_data.csv"
+        sedDataFileLocation <- "/srv/shiny-server/ENREP-telemetry/data/goes_sedevent_data.csv"
         sedDataClean <- read_csv(sedDataFileLocation, show_col_types = FALSE) %>%
           mutate(datetimeUTC = as.character(datetimeUTC))
         
@@ -77,7 +77,7 @@ server <- function(input, output) {
         
         ##### SEDEVENT DATA IMPORT  -  Iridium   ----------------------------------------------------------------------
 
-        sedDataIridium <- read_csv("/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/iridium_sedevent_data.csv",
+        sedDataIridium <- read_csv("/srv/shiny-server/ENREP-telemetry/data/iridium_sedevent_data.csv",
                                    show_col_types = FALSE) %>%
           mutate(datetimeUTC = as.character(datetimeUTC)) 
         

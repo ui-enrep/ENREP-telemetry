@@ -61,7 +61,7 @@ sedDataClean <- sedDataClean %>%
   drop_na() 
 
 # Location of stored data (either existing or to be saved)
-dataFileLocation <- "/srv/shiny-server/GOES_Data_Viewer_Shiny_App/data/goes_sedevent_data.csv"
+dataFileLocation <- "/srv/shiny-server/ENREP-telemetry/data/goes_sedevent_data.csv"
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
 # merge with newly downloaded data.
