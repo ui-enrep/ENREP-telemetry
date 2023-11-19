@@ -21,24 +21,20 @@ sidebarLayout(
     sidebarPanel(width = 0),
     
     mainPanel(
-      tabsetPanel(
-        tabPanel("GT",
-                 gt_output(outputId = "gtSedTable"),
-                 br(),
-                 br(),
-                 gt_output(outputId = "gtMetTable")
-        ),
-        tabPanel("DT",
-          DT::dataTableOutput("metTable"),
-          br(),
-          br(),
-          DT::dataTableOutput("sedEventTable")
-        )
-      ),
+      gt_output(outputId = "gtSedTable"),
       br(),
       br(),
-      checkboxGroupInput("plotCheckGroup", label = h3("Select Data to Plot"), 
-                         choices = list("Met Station" = "met", "SedEvent" = "sed")),
+      gt_output(outputId = "gtMetTable"),
+      br(),
+      br(),
+      fluidRow(column(3, checkboxGroupInput("plotCheckGroup", label = h3("Data to Plot"), inline = TRUE,
+                                            choices = list("Met Station" = "met", "SedEvent" = "sed"))),
+               column(5, radioButtons("timeframe", label = h3("Time Frame"), inline = TRUE,
+                                      choices = list("1 Month" = "months(1)", 
+                                                     "3 Months" = "months(3)", 
+                                                     "6 months" = "months(6)",
+                                                     "1 Year" = "years(1)",
+                                                     "All" = "all")))),
       plotlyOutput("metPlotly",
                    height = "1000px"),
       br(),
@@ -150,18 +146,66 @@ server <- function(input, output) {
           
     ##### OUTPUT Plots -------------------------------------------------------      
         
+        # Filter data based on time frame selected 
+        sedDataSelectedTime <- reactive({
+          if (input$timeframe != "all"){
+          sedDataMerged %>%
+            filter(datetimeUTC > Sys.time() - eval(parse(text=input$timeframe)))
+          } else {
+            sedDataMerged
+          }
+        })
+        
+        metDataSelectedTime <- reactive({
+          if (input$timeframe != "all"){
+            metDatClean %>%
+              filter(datetimePST > Sys.time() - eval(parse(text=input$timeframe)))
+          } else {
+            metDatClean
+          }
+        })
+        
         # Both plots are within observe.  Not sure this is the cleanest way to do
         # this but it works.
         observe({
           
         plotCheckGroup <- input$plotCheckGroup
         
+        ### Met Station Plot ---------------------------------------------------
+        
+        if ('met' %in% plotCheckGroup) {
+          output$metPlotly <- renderPlotly({
+            # Create ggplot
+            metPlot <- metDataSelectedTime() %>%
+              mutate(datetimePST = ymd_hms(datetimePST)) %>%
+              pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
+              ggplot(aes(x = datetimePST, y = value, color = stationID)) +
+              geom_line() +
+              geom_point(size = 1) +
+              theme_bw() +
+              facet_grid(row = vars(variable),
+                         scales = "free") +
+              labs(title = "Met Stations", y = "")
+            
+            metPlot <- ggplotly(metPlot,
+                                width = 1400,
+                                height = 1000,
+                                dynamicTicks = TRUE) %>%
+              layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
+                                   font = list(size = 24)),
+                     title = list(font = list(size = 24))) %>%
+              toWebGL()
+            
+            metPlot
+          }) } else {
+            output$metPlotly <- renderPlotly({})}
+        
         ### Sed Event Plots --------------------------------------------------
         
         if ('sed' %in% plotCheckGroup) {
           output$sedPlotly <- renderPlotly({
             # Create ggplot
-            sedPlot <- sedDataMerged %>%
+            sedPlot <- sedDataSelectedTime() %>%
               mutate(datetimeUTC = ymd_hms(datetimeUTC)) %>%
               pivot_longer(cols = -c(datetimeUTC, stationID, telem_source, basinPair),
                            names_to = "variable", values_to = "value") %>%
@@ -187,35 +231,7 @@ server <- function(input, output) {
             sedPlot
           }) } else {
             output$sedPlotly <- renderPlotly({})}
-          
-        ### Met Station Plot ---------------------------------------------------
-        
-          if ('met' %in% plotCheckGroup) {
-            output$metPlotly <- renderPlotly({
-              # Create ggplot
-              metPlot <- metDatClean %>%
-                mutate(datetimePST = ymd_hms(datetimePST)) %>%
-                pivot_longer(cols = -c(datetimePST, stationID), names_to = "variable", values_to = "value") %>%
-                ggplot(aes(x = datetimePST, y = value, color = stationID)) +
-                geom_line() +
-                geom_point(size = 1) +
-                theme_bw() +
-                facet_grid(row = vars(variable),
-                           scales = "free") +
-                labs(title = "Met Stations", y = "")
-              
-              metPlot <- ggplotly(metPlot,
-                                  width = 1400,
-                                  height = 1000,
-                                  dynamicTicks = TRUE) %>%
-                layout(legend = list(orientation = "h", x = 0.5, y = 1.06,
-                                     font = list(size = 24)),
-                       title = list(font = list(size = 24))) %>%
-                toWebGL()
-              
-              metPlot
-            }) } else {
-              output$metPlotly <- renderPlotly({})}
+
         })
 }
 

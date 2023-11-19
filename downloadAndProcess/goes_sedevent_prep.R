@@ -74,7 +74,8 @@ if (file.exists(dataFileLocation)){
   # given they are in same table.  hack fix is as.character below.  very weird.
   merged_data <- bind_rows(existing_data, sedDataClean) %>% 
     mutate(datetimeUTC = as.character(datetimeUTC)) %>%
-    distinct()
+    distinct() %>%
+    arrange(datetimeUTC)
   
   write.csv(merged_data, dataFileLocation, row.names = FALSE)
   
