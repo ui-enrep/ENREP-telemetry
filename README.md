@@ -1,45 +1,23 @@
 # GOES Telemetry
 
--   Intro
+## Introduction
 
-    -   what is this project broadly and why do we need this
+This repository houses scripts to download, clean, and display telemetered data from ENREP field equipment. The ENREP team operates flumes and meteorological stations in remote field locations and therefore needs easy access to the near real-time status of the equipment. This helps identify the health of the equipment and aid with field planning, logistics, and to ensure high quality, continuous data collection. The repository can be split into two components: raw data processing and data display.
 
-        -   Pulls together telemetry from different sources into single place
+## Data Processing
 
-        -   Identify the health of equipment and aid with field trip planning logistics
+Due to local conditions at the various equipment sites, two telemetry platforms are used to transmit data: GOES and Iridium. Accessing the data from these two platforms is either cumbersome or requires 3rd party software. A primary goal of this project is to combine the two data streams into a single dashboard.
 
-    -   Two components
+#### GOES Processing
 
-        -   Data Retrieval
+The GOES data is readily available from NOAA's [Data Distribution System (DADDS)](https://dcs1.noaa.gov/) but is cumbersome and does not allow easy identification of what transmission belongs to which piece of equipment. They do, however, provide a Java based program, the [LRGS Client](https://dcs1.noaa.gov/LRGS/LRGS-Client-Getting-Started_2021.pdf), that allows you to download data via a GUI or command line. The program is operating system agnostic although it's designed to be installed in a GUI. There may be another method, but you may need more experience with Java. It appears the installation hard codes in some directory paths to the Java scripts. We were able to manually edit those when the installation was copied to a Linux VM with no GUI.
 
-        -   Data Display
+The data retrieval and cleaning scripts call the LRGS client from with R and perform all the cleaning. The LRGS client does require configuration files to identify the NESIDs to fetch data for and for what time interval. Those configuration files are located in the 'additionalConfig' folder.
 
--   Data Retrieval
+#### Iridium Processing
 
-    -   GOES
+The Iridium data is provided through the manufacturers of the FTS SedEvent systems and their online data dashboard, [FTS360](https://360.ftsinc.com/). This website pulls all the raw Iridium data and does all the processing. However, due to the mixture of telemetry data streams, it's inconvenient to not have all streams in one place. The solution here is to scrape the data from the website and ingest it into our Shiny dashboard. The web scraping uses the `selenium/standalone-chrome:111.0` Docker container as the headless browser. Versions newer than this did not work for unknown reasons.
 
-        -   LRGS client
+#### Cron Jobs
 
-            -   java client from DCS LINK HERE
-
-            -   installer requires GUI typically. UI Linux Admins manually edited the program
-
-        -   message configuration
-
-    -   Iridium
-
-        -   FTS360 web scraping
-
-        -   Docker
-
-    -   Cron jobs
-
-        -   actual commands
-
-        -   timing
-
-This repository collects and displays telemetry data for the ENREP project.
-
-This repository contains a simple Shiny app that displays GOES and Iridium telemetry data and an external source, cleans it, and displays two tables. One table for SedEvent Data and one for Met Station. The reason for this app is to try and make a single location for checking SedEvent and Met Station telmetry data compared to going to [FTS360](https://360.ftsinc.com/) and the [GOES portal](https://dcs1.noaa.gov) separately.
-
-The incoming raw data is originally downloaded via the NOAA provided LRGS Client and currently setup as a cron job on a linux machine in the lab. Info and download for the client is available at [NOAA DCS Page](https://dcs1.noaa.gov) -\> System Information. The raw downloaded data is then synced to ownCloud and retrieved by the Shiny app via a shared file link. Some sample data of what is being pulled from ownCloud is provided in the sample_data folder.
+Data is retrieved on \~12 hour intervals from GOES and Iridium via cron jobs running in the Linux VM. The current cron jobs are located in the 'additionalConfig' folder. That text is not referenced by cron and just copied here for record.
