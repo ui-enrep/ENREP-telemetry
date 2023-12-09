@@ -9,7 +9,7 @@ library(lubridate)
 
 ## Reading in raw data and filtering the NULL character fixes issue
 
-sedDataRaw <- system("/home/ihellman/enrep/LrgsClient/bin/getDcpMessages -h lrgseddn1.cr.usgs.gov -u enrep1 -f /home/ihellman/enrep/LrgsClient/MessageBrowser_SedEvent.sc -P yrqy-XWZB-96",
+sedDataRaw <- system("/home/ihellman/enrep/LrgsClient/bin/getDcpMessages -h lrgseddn1.cr.usgs.gov -u enrep1 -f /srv/shiny-server/ENREP-telemetry/additionalConfig/MessageBrowser_SedEvent.sc -P yrqy-XWZB-96",
                      intern = TRUE)
 
 # Key to relate nesid to ENREP naming conventions
