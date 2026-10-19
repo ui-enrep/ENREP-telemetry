@@ -16,7 +16,7 @@ The data retrieval and cleaning scripts call the LRGS client from with R and per
 
 #### Iridium Processing
 
-The Iridium data is provided through the manufacturers of the FTS SedEvent systems and their online data dashboard, [FTS360](https://360.ftsinc.com/). This website pulls all the raw Iridium data and does all the processing. However, due to the mixture of telemetry data streams, it's inconvenient to not have all streams in one place. The solution here is to scrape the data from the website and ingest it into our Shiny dashboard. The web scraping uses the `selenium/standalone-chrome:111.0` Docker container as the headless browser. Versions newer than this did not work for unknown reasons.
+The Iridium data is provided through the manufacturers of the FTS SedEvent systems and their online data dashboard, [FTS360](https://360.ftsinc.com/). This website pulls all the raw Iridium data and does all the processing. However, due to the mixture of telemetry data streams, it's inconvenient to not have all streams in one place. The solution here is to scrape the data from the website and ingest it into our Shiny dashboard.
 
 #### Cron Jobs
 
