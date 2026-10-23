@@ -53,22 +53,17 @@ sedDataClean  <- tibble(raw = sedDataCleanVector) %>%
 sedDataClean <- sedDataClean %>%
   left_join(sedSiteKey, by = "nesid") %>%
   select(stationID, datetimeUTC, voltage_V, h2Temp_C, stage_ft, LSU, basinPair) %>%
-  mutate(voltage_V = as.numeric(voltage_V),
-         h2Temp_C = as.numeric(h2Temp_C),
-         stage_ft = as.numeric(stage_ft),
-         LSU = as.numeric(LSU),
-         telem_source = "GOES") %>%
+  mutate(telem_source = "GOES") %>%
   drop_na() 
 
 # Location of stored data (either existing or to be saved)
-dataFileLocation <- "/srv/shiny-server/ENREP-telemetry/data/goes_sedevent_data.csv"
+dataFileLocation <- "./data/goes_sedevent_data.csv"
 
 # Logic where: if data file does not exist, create one.  If it does exist then import it and
 # merge with newly downloaded data.
 if (file.exists(dataFileLocation)){
   # read In existing data
-  existing_data <- read_csv(dataFileLocation, show_col_types = FALSE) %>%
-    mutate(datetimeUTC = as.character(datetimeUTC))
+  existing_data <- read_csv(dataFileLocation, col_types = cols(.default = col_character()))
   
   # new_data and existing data somehow have different datatypes which seems impossible
   # given they are in same table.  hack fix is as.character below.  very weird.
