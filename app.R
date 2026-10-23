@@ -57,10 +57,9 @@ readData <- function() {
 
   sedCols <- c("stationID", "datetimeUTC", names(sedVars), "telem_source", "basinPair")
   readSed <- function(f) {
-    d <- fread(f, colClasses = list(character = "datetimeUTC"))
-    # Iridium stage sometimes arrives as a flag (e.g. "#2"); treat as missing.
-    d[, (names(sedVars)) := lapply(.SD, \(v) suppressWarnings(as.numeric(v))),
-      .SDcols = names(sedVars)]
+    # Read values as text so flags like "#2" show in the table as-is.
+    d <- fread(f, colClasses = list(character = c("datetimeUTC", names(sedVars))),
+               na.strings = c("", "NA"))
     d[, ..sedCols]
   }
   sed <- rbind(readSed(dataFiles[["sedGoes"]]), readSed(dataFiles[["sedIrid"]]))
@@ -123,7 +122,9 @@ tsPlot <- function(d, vars, colors, tzLabel) {
     p <- plot_ly()
     for (s in stations) {
       idx <- d$stationID == s
-      p <- add_trace(p, x = x[idx], y = d[[v]][idx],
+      # Non-numeric flags (e.g. "#2") become gaps.
+      y <- suppressWarnings(as.numeric(d[[v]][idx]))
+      p <- add_trace(p, x = x[idx], y = y,
                      type = "scattergl", mode = "lines+markers",
                      name = s, legendgroup = s, showlegend = i == 1,
                      line = list(color = colors[[s]], width = 1.5),
@@ -176,7 +177,7 @@ ui <- function(request) {
           timeInput("sedTime"),
           checkboxGroupInput("sedBasins", "Basin Pair", choices = basins, selected = basins)
         ),
-        card(gt_output("sedTable")),
+        card(uiOutput("sedTable")),
         card(card_header("Sed Event (UTC)"),
              plotlyOutput("sedPlot", height = "900px"))
       )
@@ -190,7 +191,7 @@ ui <- function(request) {
           checkboxGroupInput("metStations", "Station", choices = metStations,
                              selected = metStations)
         ),
-        card(gt_output("metTable")),
+        card(uiOutput("metTable")),
         card(card_header("Met Station (PST)"),
              plotlyOutput("metPlot", height = "900px"))
       )
@@ -206,7 +207,7 @@ server <- function(input, output, session) {
   metColors <- stationColors(dat$met$stationID)
 
   ### Latest value tables
-  output$sedTable <- render_gt({
+  output$sedTable <- renderUI({
     # Basin pair groups in order of their latest report; within a group, rows
     # sorted by station so GOES/Iridium rows for the same site sit together.
     d <- dat$sedLatest
@@ -219,7 +220,7 @@ server <- function(input, output, session) {
       latestTable("Sed Event")
   })
 
-  output$metTable <- render_gt({
+  output$metTable <- renderUI({
     dat$metLatest[order(stationName),
                   c("stationName", "datetimePST", names(metVars)), with = FALSE] |>
       gt(rowname_col = "stationName") |>
